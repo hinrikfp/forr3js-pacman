@@ -15,11 +15,24 @@ let pacman = {
 	location: { x: 100, y: 100 },
 	facing: [0, 1],
 	speed: 100,
+	mouths: {
+		right: [20, 340],
+		left: [200, 160],
+		up: [290, 250],
+		down: [110, 70],
+	},
 	draw() {
 		ctx.beginPath();
 		// ctx.moveTo(...this.location);
 		ctx.fillStyle = "yellow";
-		ctx.arc(this.location.x, this.location.y, 20, degToRad(20), degToRad(340));
+		ctx.arc(
+			this.location.x,
+			this.location.y,
+			20,
+			degToRad(this.mouths[inputDirection][0] + (Math.sin(Date.now() * 0.01) * 15.0)),
+			degToRad(this.mouths[inputDirection][1] - (Math.sin(Date.now() * 0.01) * 15.0)),
+		);
+		ctx.lineTo(this.location.x, this.location.y);
 		ctx.fill();
 		ctx.stroke();
 	},
@@ -41,6 +54,18 @@ let pacman = {
 	},
 }
 
+class Ghost {
+	constructor(location, color) {
+		this.location = location,
+		this.color = color,
+	}
+
+	draw() {
+		ctx.beginPath();
+		ctx.fillStyle = color;
+	}
+}
+
 let gameObjects = [
 	pacman,
 ]
@@ -48,6 +73,11 @@ let gameObjects = [
 function drawSquare(x, y, size, color) {
 	ctx.fillStyle = color;
 	ctx.fillRect(x, y, size, size)
+}
+
+function drawBg(color) {
+	ctx.fillStyle = color;
+	ctx.fillRect(0,0,canvas.width, canvas.height);
 }
 
 function gameInput(event) {
@@ -71,7 +101,7 @@ function gameInput(event) {
 
 function drawGame() {
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
-	drawSquare(0, 0, 512, bgColor);
+	drawBg(bgColor);
 	gameObjects.forEach((obj) => obj.draw())
 }
 
@@ -83,6 +113,8 @@ function gameUpdate(delta) {
 
 function start() {
 	document.addEventListener("keydown", gameInput);
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
 	ctx.scale(1, 1);
 }
 
