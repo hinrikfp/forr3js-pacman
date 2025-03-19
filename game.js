@@ -6,6 +6,12 @@ let gameMSPT = 16.6;
 let bgColor = "rgb(0,0,35)";
 
 let inputDirection = "right";
+let directions = [
+	"right",
+	"left",
+	"up",
+	"down",
+]
 
 function degToRad(deg) {
 	return deg * Math.PI / 180
@@ -18,21 +24,19 @@ class Vec2 {
 	}
 
 	addVec(v) {
-		this.x += v.x;
-		this.y += v.y;
-		return this;
+		return new Vec2(this.x + v.x, this.y + v.y);
 	}
 
 	subVec(v) {
-		this.x -= v.x;
-		this.y -= v.y;
-		return this;
+		return new Vec2(this.x - v.x, this.y - v.y);
 	}
 
 	mul(n) {
-		this.x *= n;
-		this.y *= n;
-		return this;
+		return new Vec2(this.x * n, this.y * n);
+	}
+
+	magnitude() {
+		return Math.sqrt(this.x * this.x + this.y * this.y);
 	}
 
 	normalize() {
@@ -49,10 +53,13 @@ class Vec2 {
 }
 
 class Pacman {
+	tag = "Pacman";
 	constructor(location, speed, radius) {
 		this.location = location;
 		this.speed = speed;
 		this.radius = radius;
+		this.points = 0;
+		this.direction = "right";
 		this.mouths = {
 			right: [20, 340],
 			left: [200, 160],
@@ -78,7 +85,8 @@ class Pacman {
 	}
 
 	update(delta) {
-		switch (inputDirection) {
+		this.direction = inputDirection;
+		switch (this.direction) {
 			case "right":
 				this.location.x += this.speed * delta;
 				break;
@@ -93,13 +101,28 @@ class Pacman {
 				break;
 		}
 	}
+
+	collision(c) {
+		// console.log(`collision with ${c.tag}`)
+		if (c.tag === "Point") {
+			this.points += c.worth;
+			c.delete();
+			console.log(`points: ${this.points}`);
+		}
+		if (c.tag === "Wall") {
+			// console.log("Wall");
+		}
+	}
 }
 
 class Ghost {
-	constructor(location, color, radius) {
+	tag = "Ghost";
+	constructor(location, color, radius, speed) {
 		this.location = location;
 		this.color = color;
 		this.radius = radius;
+		this.speed = speed;
+		this.direction = "left";
 	}
 
 	draw() {
@@ -120,11 +143,34 @@ class Ghost {
 	}
 
 	update(delta) {
-		this.location.x += 10 * delta;
+		switch (this.direction) {
+			case "right":
+				this.location.x += this.speed * delta;
+				break;
+			case "left":
+				this.location.x -= this.speed * delta;
+				break;
+			case "up":
+				this.location.y -= this.speed * delta;
+				break;
+			case "down":
+				this.location.y += this.speed * delta;
+				break;
+		}
+	}
+
+	collision(c) {
+		// console.log(`collision with ${c.tag}`)
+		if (c.tag === "Wall") {
+			let new_direction = directions[Math.floor(Math.random() * 4)];
+			console.log(new_direction);
+			this.direction = new_direction;
+		}
 	}
 }
 
 class Point {
+	tag = "Point";
 	constructor(location, worth, color, radius) {
 		this.location = location;
 		this.worth = worth;
@@ -141,16 +187,123 @@ class Point {
 	}
 
 	update(delta) { }
+
+	collision(c) {
+		// console.log(`collision with ${c.tag}`)
+	}
+
+	delete() {
+		game.gameObjects.splice(game.gameObjects.indexOf(this), 1);
+	}
 }
 
-let pacman = new Pacman(new Vec2(100, 100), 100, 15);
+class Wall {
+	tag = "Wall"
+	constructor(location, width, height, color) {
+		this.location = location;
+		this.width = width;
+		this.height = height;
+		this.color = color;
+	}
 
-let gameObjects = [
-	pacman,
-	new Ghost(new Vec2(200, 200), "red", 15),
-	new Ghost(new Vec2(250, 200), "blue", 15),
-	new Point(new Vec2(100, 100), 10, "#ebcb4b", 5),
-]
+	draw() {
+		ctx.fillStyle = this.color;
+		let x = this.location.x - this.width / 2;
+		let y = this.location.y - this.height / 2;
+		ctx.fillRect(x, y, this.width, this.height);
+	}
+
+	update(delta) { }
+
+	collision(c) { }
+}
+
+class Game {
+	constructor() {
+		this.pacman = new Pacman(new Vec2(100, 100), 100, 15);
+		this.ghosts = [
+			new Ghost(new Vec2(200, 200), "red", 15, 60),
+			new Ghost(new Vec2(250, 200), "pink", 15, 80),
+			new Ghost(new Vec2(300, 200), "cyan", 15, 65),
+			new Ghost(new Vec2(350, 200), "orange", 15, 70),
+		];
+		this.points = [
+			new Point(new Vec2(500, 100), 10, "#ebcb4b", 5),
+		]
+		this.walls = [
+			new Wall(new Vec2(10, 250), 20, 500, "green"),
+			new Wall(new Vec2(500, 500), 1000, 20, "green"),
+			new Wall(new Vec2(500, 10), 1000, 20, "green"),
+			new Wall(new Vec2(1010, 255), 20, 510, "green"),
+		];
+
+		this.gameObjects = [];
+		this.gameObjects.push(this.pacman);
+		this.ghosts.forEach((g) => { this.gameObjects.unshift(g) });
+		this.points.forEach((p) => { this.gameObjects.unshift(p) });
+		this.walls.forEach((w) => { this.gameObjects.unshift(w) });
+	}
+
+	draw() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		drawBg(bgColor);
+		game.gameObjects.forEach((obj) => obj.draw())
+	}
+
+	collide() {
+		for (let c1 of this.gameObjects) {
+			if (c1.hasOwnProperty("radius")) {
+				for (let c2 of this.gameObjects) {
+					if (c2 === c1) {
+						continue;
+					}
+					if (c2.hasOwnProperty("radius")) {
+						let totalRadius = c1.radius + c2.radius;
+						let distance = c1.location.subVec(c2.location).magnitude();
+						if (distance <= totalRadius) {
+							c1.collision(c2);
+						}
+					} else if (c2.hasOwnProperty("width") && c2.hasOwnProperty("height")) {
+						if (
+							c1.location.x > (c2.location.x - (c2.width / 2) - c1.radius) &&
+							c1.location.x < (c2.location.x + (c2.width / 2) + c1.radius) &&
+							c1.location.y > (c2.location.y - (c2.height / 2) - c1.radius) &&
+							c1.location.y < (c2.location.y + (c2.height / 2) + c1.radius)
+						) {
+							switch (c1.direction) {
+								case "left":
+									c1.location.x = c2.location.x + (c2.width / 2) + c1.radius;
+									break;
+								case "right":
+									c1.location.x = c2.location.x - (c2.width / 2) - c1.radius;
+									break;
+								case "up":
+									c1.location.y = c2.location.y + (c2.height / 2) + c1.radius;
+									break;
+								case "down":
+									c1.location.y = c2.location.y - (c2.height / 2) - c1.radius;
+									break;
+							}
+							c1.collision(c2);
+						}
+					} else {
+						continue;
+					}
+				}
+			}
+		}
+	}
+
+	update(delta) {
+		game.gameObjects.forEach((obj) => obj.update(delta));
+
+		this.collide();
+
+		this.draw();
+	}
+}
+
+let game = new Game();
 
 function drawSquare(x, y, size, color) {
 	ctx.fillStyle = color;
@@ -181,22 +334,15 @@ function gameInput(event) {
 	}
 }
 
-function drawGame() {
-	ctx.clearRect(0, 0, canvas.width, canvas.height);
-	drawBg(bgColor);
-	gameObjects.forEach((obj) => obj.draw())
-}
 
 function gameUpdate(delta) {
-	gameObjects.forEach((obj) => obj.update(delta))
-
-	drawGame()
+	game.update(delta);
 }
 
 function start() {
 	document.addEventListener("keydown", gameInput);
 	canvas.width = window.innerWidth;
-	canvas.height = window.innerHeight;
+	canvas.height = window.innerHeight - 5;
 	ctx.scale(1, 1);
 }
 
