@@ -6,12 +6,16 @@ let gameMSPT = 16.6;
 let bgColor = "rgb(0,0,35)";
 
 let inputDirection = "right";
-let directions = [
+const DIRECTIONS = [
 	"right",
 	"left",
 	"up",
 	"down",
 ]
+
+let ongoingTouches = new Map();
+
+let wallEditOn = true;
 
 function degToRad(deg) {
 	return deg * Math.PI / 180
@@ -40,9 +44,8 @@ class Vec2 {
 	}
 
 	normalize() {
-		let mag = Math.sqrt(this.x * this.x + this.y * this.y);
-		this.x = this.x / mag;
-		this.y = this.y / mag;
+		this.x = this.x / this.magnitude();
+		this.y = this.y / this.magnitude();
 		return this;
 	}
 
@@ -54,12 +57,14 @@ class Vec2 {
 
 class Pacman {
 	tag = "Pacman";
+	shouldCollide = true;
 	constructor(location, speed, radius) {
 		this.location = location;
 		this.speed = speed;
 		this.radius = radius;
 		this.points = 0;
 		this.direction = "right";
+
 		this.mouths = {
 			right: [20, 340],
 			left: [200, 160],
@@ -107,7 +112,7 @@ class Pacman {
 		if (c.tag === "Point") {
 			this.points += c.worth;
 			c.delete();
-			console.log(`points: ${this.points}`);
+			// console.log(`points: ${this.points}`);
 		}
 		if (c.tag === "Wall") {
 			// console.log("Wall");
@@ -117,6 +122,7 @@ class Pacman {
 
 class Ghost {
 	tag = "Ghost";
+	shouldCollide = true;
 	constructor(location, color, radius, speed) {
 		this.location = location;
 		this.color = color;
@@ -127,7 +133,6 @@ class Ghost {
 
 	draw() {
 		ctx.beginPath();
-		// ctx.moveTo(...this.location);
 		ctx.fillStyle = this.color;
 		ctx.arc(
 			this.location.x,
@@ -162,8 +167,7 @@ class Ghost {
 	collision(c) {
 		// console.log(`collision with ${c.tag}`)
 		if (c.tag === "Wall") {
-			let new_direction = directions[Math.floor(Math.random() * 4)];
-			console.log(new_direction);
+			let new_direction = DIRECTIONS[Math.floor(Math.random() * 4)];
 			this.direction = new_direction;
 		}
 	}
@@ -171,6 +175,7 @@ class Ghost {
 
 class Point {
 	tag = "Point";
+	shouldCollide = true;
 	constructor(location, worth, color, radius) {
 		this.location = location;
 		this.worth = worth;
@@ -190,6 +195,9 @@ class Point {
 
 	collision(c) {
 		// console.log(`collision with ${c.tag}`)
+		if (c.tag == "Wall") {
+			this.delete();
+		}
 	}
 
 	delete() {
@@ -199,6 +207,7 @@ class Point {
 
 class Wall {
 	tag = "Wall"
+	shouldCollide = true;
 	constructor(location, width, height, color) {
 		this.location = location;
 		this.width = width;
@@ -218,6 +227,32 @@ class Wall {
 	collision(c) { }
 }
 
+class Grid {
+	tag = "Grid";
+	shouldCollide = false;
+	constructor(position, width, height, spacing) {
+		this.position = position;
+		this.width = width;
+		this.height = height;
+		this.spacing = spacing;
+	}
+
+	draw() {
+		ctx.fillStyle = "blue";
+		for (let x = 0; x <= this.width; x += this.spacing) {
+			ctx.fillRect(this.position.x + x, this.position.y, 1, this.height);
+		}
+		for (let y = 0; y <= this.height; y += this.spacing) {
+			ctx.fillRect(this.position.x, this.position.y + y, this.width, 1);
+		}
+	}
+
+	update(delta) { }
+	collision(c) { }
+}
+
+let grid = new Grid(new Vec2(10, 10), 540, 540, 30);
+
 class Game {
 	constructor() {
 		this.pacman = new Pacman(new Vec2(100, 100), 100, 15);
@@ -227,18 +262,25 @@ class Game {
 			new Ghost(new Vec2(300, 200), "cyan", 15, 65),
 			new Ghost(new Vec2(350, 200), "orange", 15, 70),
 		];
-		this.points = [
-			new Point(new Vec2(500, 100), 10, "#ebcb4b", 5),
-		]
+		this.points = []
+		for (let x = 0; x < 17; x++) {
+			for (let y = 0; y < 17; y++) {
+				this.points.push(new Point(new Vec2(40 + x * 30, 40 + y * 30), 10, "#ebcb4b", 5))
+			}
+		}
 		this.walls = [
-			new Wall(new Vec2(10, 250), 20, 500, "green"),
-			new Wall(new Vec2(500, 500), 1000, 20, "green"),
-			new Wall(new Vec2(500, 10), 1000, 20, "green"),
-			new Wall(new Vec2(1010, 255), 20, 510, "green"),
+			new Wall(new Vec2(10, 280), 20, 560, "green"),
+			new Wall(new Vec2(280, 550), 560, 20, "green"),
+			new Wall(new Vec2(280, 10), 560, 20, "green"),
+			new Wall(new Vec2(550, 280), 20, 560, "green"),
+			new Wall(new Vec2(280, 530), 20, 40, "green"),
+			new Wall(new Vec2(280, 35), 20, 40, "green"),
+			// new Wall(new Vec2(280, 280), 320, 20, "green"),
 		];
 
 		this.gameObjects = [];
 		this.gameObjects.push(this.pacman);
+		this.gameObjects.push(grid);
 		this.ghosts.forEach((g) => { this.gameObjects.unshift(g) });
 		this.points.forEach((p) => { this.gameObjects.unshift(p) });
 		this.walls.forEach((w) => { this.gameObjects.unshift(w) });
@@ -252,11 +294,15 @@ class Game {
 
 	collide() {
 		for (let c1 of this.gameObjects) {
+			if (c1.shouldCollide === false) {
+				continue;
+			}
 			if (c1.hasOwnProperty("radius")) {
 				for (let c2 of this.gameObjects) {
 					if (c2 === c1) {
 						continue;
 					}
+					if (c2.shouldCollide === false) { continue; }
 					if (c2.hasOwnProperty("radius")) {
 						let totalRadius = c1.radius + c2.radius;
 						let distance = c1.location.subVec(c2.location).magnitude();
@@ -334,6 +380,37 @@ function gameInput(event) {
 	}
 }
 
+function handlePointerStart(event) {
+	ongoingTouches.set(event.pointerId, new Vec2(event.pageX, event.pageY));
+}
+
+function handlePointerEnd(event) {
+	let touch = {
+		start: ongoingTouches.get(event.pointerId),
+		end: new Vec2(event.pageX, event.pageY),
+	};
+
+	if (wallEditOn) {
+		let wallStart = new Vec2(
+			Math.round(touch.start.x / grid.spacing) * grid.spacing,
+			Math.round(touch.start.y / grid.spacing) * grid.spacing
+		).addVec(grid.position);
+		let wallEnd = new Vec2(
+			Math.round(touch.end.x / grid.spacing) * grid.spacing,
+			Math.round(touch.end.y / grid.spacing) * grid.spacing
+		).addVec(grid.position);
+
+		let wallPos = new Vec2((wallStart.x + wallEnd.x) / 2, (wallStart.y + wallEnd.y) / 2);
+		let wallWidth = Math.abs(wallStart.subVec(wallEnd).x) + 20;
+		let wallHeight = Math.abs(wallStart.subVec(wallEnd).y) + 20;
+		let newWall = new Wall(wallPos, wallWidth, wallHeight, "green");
+		console.log(newWall);
+		game.gameObjects.unshift(newWall);
+	}
+
+	ongoingTouches.delete(event.pointerId);
+}
+
 
 function gameUpdate(delta) {
 	game.update(delta);
@@ -341,9 +418,12 @@ function gameUpdate(delta) {
 
 function start() {
 	document.addEventListener("keydown", gameInput);
+	document.addEventListener("pointerdown", handlePointerStart);
+	document.addEventListener("pointerup", handlePointerEnd);
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight - 5;
 	ctx.scale(1, 1);
+	console.log(game.gameObjects);
 }
 
 start();
