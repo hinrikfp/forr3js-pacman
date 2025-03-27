@@ -16,9 +16,16 @@ const DIRECTIONS = [
 let ongoingTouches = new Map();
 
 let wallEditOn = true;
+let lastAddedWall;
 
 function degToRad(deg) {
 	return deg * Math.PI / 180
+}
+
+function weightedRandom(values, weights) {
+	let weightSum = 0;
+	weights.forEach((w) => weightSum += w);
+
 }
 
 class Vec2 {
@@ -58,8 +65,8 @@ class Vec2 {
 class Pacman {
 	tag = "Pacman";
 	shouldCollide = true;
-	constructor(location, speed, radius) {
-		this.location = location;
+	constructor(position, speed, radius) {
+		this.position = position;
 		this.speed = speed;
 		this.radius = radius;
 		this.points = 0;
@@ -75,16 +82,16 @@ class Pacman {
 
 	draw() {
 		ctx.beginPath();
-		// ctx.moveTo(...this.location);
+		// ctx.moveTo(...this.position);
 		ctx.fillStyle = "yellow";
 		ctx.arc(
-			this.location.x,
-			this.location.y,
+			this.position.x,
+			this.position.y,
 			this.radius,
 			degToRad(this.mouths[inputDirection][0] + (Math.sin(Date.now() * 0.01) * 15.0)),
 			degToRad(this.mouths[inputDirection][1] - (Math.sin(Date.now() * 0.01) * 15.0)),
 		);
-		ctx.lineTo(this.location.x, this.location.y);
+		ctx.lineTo(this.position.x, this.position.y);
 		ctx.fill();
 		ctx.stroke();
 	}
@@ -93,16 +100,16 @@ class Pacman {
 		this.direction = inputDirection;
 		switch (this.direction) {
 			case "right":
-				this.location.x += this.speed * delta;
+				this.position.x += this.speed * delta;
 				break;
 			case "left":
-				this.location.x -= this.speed * delta;
+				this.position.x -= this.speed * delta;
 				break;
 			case "up":
-				this.location.y -= this.speed * delta;
+				this.position.y -= this.speed * delta;
 				break;
 			case "down":
-				this.location.y += this.speed * delta;
+				this.position.y += this.speed * delta;
 				break;
 		}
 	}
@@ -120,29 +127,52 @@ class Pacman {
 	}
 }
 
+class CollisionChecker {
+	tag = "CollisionChecker";
+	shouldCollide = true;
+	constructor(position, radius) {
+		this.position = position;
+		this.radius = radius;
+	}
+
+	draw() { }
+	update(delta) { }
+	collision(c) { }
+
+	isColliding() {
+		return collisionsForObject(this, game.gameObjects, (c1, c2) => { }, (c1, c2) => { });
+	}
+}
+
 class Ghost {
 	tag = "Ghost";
 	shouldCollide = true;
-	constructor(location, color, radius, speed) {
-		this.location = location;
+	constructor(position, color, radius, speed) {
+		this.position = position;
 		this.color = color;
 		this.radius = radius;
 		this.speed = speed;
 		this.direction = "left";
+		this.directionCheckers = {
+			up: new CollisionChecker(position.addVec(new Vec2(0, -this.radius * 2))),
+			down: new CollisionChecker(position.addVec(new Vec2(0, this.radius * 2))),
+			right: new CollisionChecker(position.addVec(new Vec2(this.radius * 2, 0))),
+			left: new CollisionChecker(position.addVec(new Vec2(-this.radius * 2, 0))),
+		}
 	}
 
 	draw() {
 		ctx.beginPath();
 		ctx.fillStyle = this.color;
 		ctx.arc(
-			this.location.x,
-			this.location.y,
+			this.position.x,
+			this.position.y,
 			this.radius,
 			degToRad(180),
 			degToRad(360),
 		);
-		ctx.lineTo(this.location.x + this.radius, this.location.y + this.radius);
-		ctx.lineTo(this.location.x - this.radius, this.location.y + this.radius);
+		ctx.lineTo(this.position.x + this.radius, this.position.y + this.radius);
+		ctx.lineTo(this.position.x - this.radius, this.position.y + this.radius);
 		ctx.fill();
 		ctx.stroke();
 	}
@@ -150,16 +180,16 @@ class Ghost {
 	update(delta) {
 		switch (this.direction) {
 			case "right":
-				this.location.x += this.speed * delta;
+				this.position.x += this.speed * delta;
 				break;
 			case "left":
-				this.location.x -= this.speed * delta;
+				this.position.x -= this.speed * delta;
 				break;
 			case "up":
-				this.location.y -= this.speed * delta;
+				this.position.y -= this.speed * delta;
 				break;
 			case "down":
-				this.location.y += this.speed * delta;
+				this.position.y += this.speed * delta;
 				break;
 		}
 	}
@@ -176,8 +206,8 @@ class Ghost {
 class Point {
 	tag = "Point";
 	shouldCollide = true;
-	constructor(location, worth, color, radius) {
-		this.location = location;
+	constructor(position, worth, color, radius) {
+		this.position = position;
 		this.worth = worth;
 		this.radius = radius;
 		this.color = color;
@@ -186,7 +216,7 @@ class Point {
 	draw() {
 		ctx.beginPath();
 		ctx.fillStyle = this.color;
-		ctx.arc(this.location.x, this.location.y, this.radius, 0, 360);
+		ctx.arc(this.position.x, this.position.y, this.radius, 0, 360);
 		ctx.fill();
 		ctx.stroke();
 	}
@@ -208,8 +238,8 @@ class Point {
 class Wall {
 	tag = "Wall"
 	shouldCollide = true;
-	constructor(location, width, height, color) {
-		this.location = location;
+	constructor(position, width, height, color) {
+		this.position = position;
 		this.width = width;
 		this.height = height;
 		this.color = color;
@@ -217,8 +247,8 @@ class Wall {
 
 	draw() {
 		ctx.fillStyle = this.color;
-		let x = this.location.x - this.width / 2;
-		let y = this.location.y - this.height / 2;
+		let x = this.position.x - this.width / 2;
+		let y = this.position.y - this.height / 2;
 		ctx.fillRect(x, y, this.width, this.height);
 	}
 
@@ -273,9 +303,6 @@ class Game {
 			new Wall(new Vec2(280, 550), 560, 20, "green"),
 			new Wall(new Vec2(280, 10), 560, 20, "green"),
 			new Wall(new Vec2(550, 280), 20, 560, "green"),
-			new Wall(new Vec2(280, 530), 20, 40, "green"),
-			new Wall(new Vec2(280, 35), 20, 40, "green"),
-			// new Wall(new Vec2(280, 280), 320, 20, "green"),
 		];
 
 		this.gameObjects = [];
@@ -293,51 +320,31 @@ class Game {
 	}
 
 	collide() {
-		for (let c1 of this.gameObjects) {
-			if (c1.shouldCollide === false) {
-				continue;
-			}
-			if (c1.hasOwnProperty("radius")) {
-				for (let c2 of this.gameObjects) {
-					if (c2 === c1) {
-						continue;
-					}
-					if (c2.shouldCollide === false) { continue; }
-					if (c2.hasOwnProperty("radius")) {
-						let totalRadius = c1.radius + c2.radius;
-						let distance = c1.location.subVec(c2.location).magnitude();
-						if (distance <= totalRadius) {
-							c1.collision(c2);
-						}
-					} else if (c2.hasOwnProperty("width") && c2.hasOwnProperty("height")) {
-						if (
-							c1.location.x > (c2.location.x - (c2.width / 2) - c1.radius) &&
-							c1.location.x < (c2.location.x + (c2.width / 2) + c1.radius) &&
-							c1.location.y > (c2.location.y - (c2.height / 2) - c1.radius) &&
-							c1.location.y < (c2.location.y + (c2.height / 2) + c1.radius)
-						) {
-							switch (c1.direction) {
-								case "left":
-									c1.location.x = c2.location.x + (c2.width / 2) + c1.radius;
-									break;
-								case "right":
-									c1.location.x = c2.location.x - (c2.width / 2) - c1.radius;
-									break;
-								case "up":
-									c1.location.y = c2.location.y + (c2.height / 2) + c1.radius;
-									break;
-								case "down":
-									c1.location.y = c2.location.y - (c2.height / 2) - c1.radius;
-									break;
-							}
-							c1.collision(c2);
-						}
-					} else {
-						continue;
-					}
+		checkCollisions(
+			this.gameObjects,
+			(c1, c2) => {
+				c1.collision(c2);
+				c2.collision(c1);
+			},
+			(c1, c2) => {
+				switch (c1.direction) {
+					case "left":
+						c1.position.x = c2.position.x + (c2.width / 2) + c1.radius;
+						break;
+					case "right":
+						c1.position.x = c2.position.x - (c2.width / 2) - c1.radius;
+						break;
+					case "up":
+						c1.position.y = c2.position.y + (c2.height / 2) + c1.radius;
+						break;
+					case "down":
+						c1.position.y = c2.position.y - (c2.height / 2) - c1.radius;
+						break;
 				}
+				c1.collision(c2);
+				c2.collision(c1);
 			}
-		}
+		);
 	}
 
 	update(delta) {
@@ -350,6 +357,98 @@ class Game {
 }
 
 let game = new Game();
+
+function checkCollisions(collisionObjects, onCircleCollision, onRectCollision) {
+	for (let i = 0; i < collisionObjects.length; i++) {
+		c1 = collisionObjects[i];
+		if (c1.shouldCollide === false) {
+			continue;
+		}
+		for (let j = i + 1; j < collisionObjects.length; j++) {
+			c2 = collisionObjects[j];
+			if (c2.shouldCollide === false) {
+				continue;
+			}
+			checkForCollision(c1, c2, onCircleCollision, onRectCollision);
+		}
+	}
+}
+
+function checkForCollision(c1, c2, onCircleCollision, onRectCollision) {
+	let collides = false;
+	if (isCircle(c1) && isCircle(c2)) {
+		let totalRadius = c1.radius + c2.radius;
+		let distance = c1.position.subVec(c2.position).magnitude();
+		if (distance <= totalRadius) {
+			onCircleCollision(c1, c2);
+			collides = true;
+		}
+	} else if (isCircle(c1) && isRect(c2)) {
+		if (checkCircleRectCollision(c1, c2)) {
+			onRectCollision(c1, c2);
+			collides = true;
+		}
+	} else if (isRect(c1) && isCircle(c2)) {
+		if (checkCircleRectCollision(c2, c1)) {
+			onRectCollision(c2, c1);
+			collides = true;
+		}
+	}
+	return collides;
+}
+
+function checkCircleRectCollision(c, r) {
+	return (
+		c.position.x > (r.position.x - (r.width / 2) - c.radius) &&
+		c.position.x < (r.position.x + (r.width / 2) + c.radius) &&
+		c.position.y > (r.position.y - (r.height / 2) - c.radius) &&
+		c.position.y < (r.position.y + (r.height / 2) + c.radius)
+	)
+}
+
+function collisionsForObject(c1, collisionObjects, onCircleCollision, onRectCollision) {
+	let collides = false;
+	if (c1.shouldCollide === false) {
+		return false;
+	}
+	if (c1.hasOwnProperty("radius")) {
+		for (let c2 of collisionObjects) {
+			if (c2 === c1) {
+				continue;
+			}
+			if (c2.shouldCollide === false) { continue; }
+			if (c2.hasOwnProperty("radius")) {
+				let totalRadius = c1.radius + c2.radius;
+				let distance = c1.position.subVec(c2.position).magnitude();
+				if (distance <= totalRadius) {
+					onCircleCollision(c1, c2);
+					collides = true;
+				}
+			} else if (c2.hasOwnProperty("width") && c2.hasOwnProperty("height")) {
+				if (
+					c1.position.x > (c2.position.x - (c2.width / 2) - c1.radius) &&
+					c1.position.x < (c2.position.x + (c2.width / 2) + c1.radius) &&
+					c1.position.y > (c2.position.y - (c2.height / 2) - c1.radius) &&
+					c1.position.y < (c2.position.y + (c2.height / 2) + c1.radius)
+				) {
+					onRectCollision(c1, c2);
+					collides = true;
+				}
+			} else {
+				continue;
+			}
+		}
+	}
+	return collides;
+}
+
+function isRect(o) {
+	return o.hasOwnProperty("width") && o.hasOwnProperty("height")
+}
+
+function isCircle(o) {
+	return o.hasOwnProperty("radius")
+}
 
 function drawSquare(x, y, size, color) {
 	ctx.fillStyle = color;
@@ -376,6 +475,10 @@ function gameInput(event) {
 			break;
 		case "ArrowDown":
 			inputDirection = "down";
+			break;
+		case "z":
+			console.log("undo");
+			game.gameObjects.splice(game.gameObjects.indexOf(lastAddedWall), 1);
 			break;
 	}
 }
@@ -406,6 +509,7 @@ function handlePointerEnd(event) {
 		let newWall = new Wall(wallPos, wallWidth, wallHeight, "green");
 		console.log(newWall);
 		game.gameObjects.unshift(newWall);
+		lastAddedWall = newWall;
 	}
 
 	ongoingTouches.delete(event.pointerId);
