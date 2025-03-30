@@ -25,7 +25,15 @@ function degToRad(deg) {
 function weightedRandom(values, weights) {
 	let weightSum = 0;
 	weights.forEach((w) => weightSum += w);
+	let random = Math.random() * weightSum;
 
+	let cursor = 0;
+	for (let i = 0; i < weights.length; i++) {
+		cursor += weights[i];
+		if (cursor >= random) {
+			return values[i];
+		}
+	}
 }
 
 class Vec2 {
@@ -130,6 +138,7 @@ class Pacman {
 class CollisionChecker {
 	tag = "CollisionChecker";
 	shouldCollide = true;
+	collides = false;
 	constructor(position, radius) {
 		this.position = position;
 		this.radius = radius;
@@ -140,7 +149,9 @@ class CollisionChecker {
 	collision(c) { }
 
 	isColliding() {
-		return collisionsForObject(this, game.gameObjects, (c1, c2) => { }, (c1, c2) => { });
+		this.collides = false;
+		collisionsForObject(this, game.gameObjects, (c1, c2) => { }, (c1, c2) => { if (c2.tag === "Wall") { c1.collides = true } });
+		return this.collides;
 	}
 }
 
@@ -154,10 +165,16 @@ class Ghost {
 		this.speed = speed;
 		this.direction = "left";
 		this.directionCheckers = {
-			up: new CollisionChecker(position.addVec(new Vec2(0, -this.radius * 2))),
-			down: new CollisionChecker(position.addVec(new Vec2(0, this.radius * 2))),
-			right: new CollisionChecker(position.addVec(new Vec2(this.radius * 2, 0))),
-			left: new CollisionChecker(position.addVec(new Vec2(-this.radius * 2, 0))),
+			up: new CollisionChecker(position.addVec(new Vec2(0, -this.radius * 2)), this.radius),
+			down: new CollisionChecker(position.addVec(new Vec2(0, this.radius * 2)), this.radius),
+			left: new CollisionChecker(position.addVec(new Vec2(-this.radius * 2, 0)), this.radius),
+			right: new CollisionChecker(position.addVec(new Vec2(this.radius * 2, 0)), this.radius),
+		}
+		this.prevDirectionChecks = {
+			up: false,
+			down: false,
+			left: false,
+			right: false,
 		}
 	}
 
@@ -178,6 +195,13 @@ class Ghost {
 	}
 
 	update(delta) {
+		// console.log("down: ", this.directionCheckers.down.isColliding());
+
+		this.directionCheckers.up.position = this.position.addVec(new Vec2(0, -this.radius * 2));
+		this.directionCheckers.down.position = this.position.addVec(new Vec2(0, this.radius * 2));
+		this.directionCheckers.left.position = this.position.addVec(new Vec2(-this.radius * 2), 0);
+		this.directionCheckers.right.position = this.position.addVec(new Vec2(this.radius * 2, 0));
+
 		switch (this.direction) {
 			case "right":
 				this.position.x += this.speed * delta;
@@ -192,14 +216,55 @@ class Ghost {
 				this.position.y += this.speed * delta;
 				break;
 		}
+
+		if (this.direction === "up" || this.direction === "down") {
+			let rightChanged = (!this.directionCheckers.right.isColliding() && this.prevDirectionChecks.right);
+			let leftChanged = (!this.directionCheckers.left.isColliding() && this.prevDirectionChecks.left);
+			let upWeight = this.direction === "up" ? 10 : 0;
+			let downWeight = this.direction === "down" ? 10 : 0;
+			let leftWeight = leftChanged ? 10 : 0;
+			let rightWeight = rightChanged ? 10 : 0;
+			this.changeDirection(upWeight, downWeight, leftWeight, rightWeight);
+		} else if (this.direction === "left" || this.direction === "right") {
+			let upChanged = (!this.directionCheckers.up.isColliding() && this.prevDirectionChecks.up);
+			let downChanged = (!this.directionCheckers.down.isColliding() && this.prevDirectionChecks.down);
+			let leftWeight = this.direction === "left" ? 10 : 0;
+			let rightWeight = this.direction === "right" ? 10 : 0;
+			let upWeight = upChanged ? 10 : 0;
+			let downWeight = downChanged ? 10 : 0;
+			this.changeDirection(upWeight, downWeight, leftWeight, rightWeight);
+		}
+
+		console.log(this.prevDirectionChecks);
+
+		this.prevDirectionChecks.up = this.directionCheckers.up.isColliding();
+		this.prevDirectionChecks.down = this.directionCheckers.down.isColliding();
+		this.prevDirectionChecks.left = this.directionCheckers.left.isColliding();
+		this.prevDirectionChecks.right = this.directionCheckers.right.isColliding();
 	}
 
 	collision(c) {
 		// console.log(`collision with ${c.tag}`)
 		if (c.tag === "Wall") {
-			let new_direction = DIRECTIONS[Math.floor(Math.random() * 4)];
-			this.direction = new_direction;
+			this.changeDirection(10, 10, 10, 10);
 		}
+	}
+
+	changeDirection(upWeight, downWeight, leftWeight, rightWeight) {
+		let pacmanDirection = game.pacman.position.subVec(this.position).normalized();
+		if (pacmanDirection.x > 0) {
+			rightWeight += Math.round(rightWeight * pacmanDirection.x);
+		} else {
+			leftWeight += Math.round(leftWeight * Math.abs(pacmanDirection.x));
+		}
+		if (pacmanDirection.y > 0) {
+			downWeight += Math.round(downWeight * pacmanDirection.y);
+		} else {
+			upWeight += Math.round(upWeight * Math.abs(pacmanDirection.y));
+		}
+		let weights = [upWeight, downWeight, leftWeight, rightWeight];
+		let newDirection = weightedRandom(["up", "down", "left", "right"], weights)
+		this.direction = newDirection
 	}
 }
 
@@ -407,39 +472,20 @@ function checkCircleRectCollision(c, r) {
 }
 
 function collisionsForObject(c1, collisionObjects, onCircleCollision, onRectCollision) {
-	let collides = false;
+	let collides = false
 	if (c1.shouldCollide === false) {
 		return false;
 	}
-	if (c1.hasOwnProperty("radius")) {
-		for (let c2 of collisionObjects) {
-			if (c2 === c1) {
-				continue;
-			}
-			if (c2.shouldCollide === false) { continue; }
-			if (c2.hasOwnProperty("radius")) {
-				let totalRadius = c1.radius + c2.radius;
-				let distance = c1.position.subVec(c2.position).magnitude();
-				if (distance <= totalRadius) {
-					onCircleCollision(c1, c2);
-					collides = true;
-				}
-			} else if (c2.hasOwnProperty("width") && c2.hasOwnProperty("height")) {
-				if (
-					c1.position.x > (c2.position.x - (c2.width / 2) - c1.radius) &&
-					c1.position.x < (c2.position.x + (c2.width / 2) + c1.radius) &&
-					c1.position.y > (c2.position.y - (c2.height / 2) - c1.radius) &&
-					c1.position.y < (c2.position.y + (c2.height / 2) + c1.radius)
-				) {
-					onRectCollision(c1, c2);
-					collides = true;
-				}
-			} else {
-				continue;
-			}
+	for (let c2 of collisionObjects) {
+		if (c2 === c1) { continue; }
+		if (c2.shouldCollide === false) { continue; }
+		let thisCollides = checkForCollision(c1, c2, onCircleCollision, onRectCollision)
+		if (collides === false && thisCollides === true) {
+			collides = true;
 		}
 	}
-	return collides;
+
+	return collides
 }
 
 function isRect(o) {
