@@ -17,6 +17,10 @@ let ongoingTouches = new Map();
 
 let wallEditOn = true;
 let lastAddedWall;
+let newMap = [];
+let mapToLoad = [
+	{ "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 535 }, "width": 140, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 400, "y": 520 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 160, "y": 520 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 460 }, "width": 140, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 85, "y": 490 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 100, "y": 460 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 475, "y": 490 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 460, "y": 460 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 25, "y": 430 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 535, "y": 430 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 160, "y": 400 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 400, "y": 400 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 385 }, "width": 80, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 145, "y": 370 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 415, "y": 370 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 25, "y": 340 }, "width": 50, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 535, "y": 340 }, "width": 50, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 100, "y": 280 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 85, "y": 250 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 460, "y": 280 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 475, "y": 250 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 175, "y": 310 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 160, "y": 295 }, "width": 20, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 385, "y": 310 }, "width": 50, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 400, "y": 295 }, "width": 20, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 280 }, "width": 80, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 235 }, "width": 20, "height": 110, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 370, "y": 205 }, "width": 80, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 190, "y": 205 }, "width": 80, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 55, "y": 190 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 505, "y": 190 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 175, "y": 130 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 385, "y": 130 }, "width": 110, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 100 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 280, "y": 70 }, "width": 80, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 370, "y": 55 }, "width": 20, "height": 50, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 190, "y": 40 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 70, "y": 100 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 100, "y": 70 }, "width": 80, "height": 20, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 490, "y": 100 }, "width": 20, "height": 80, "color": "green" }, { "tag": "Wall", "shouldCollide": true, "position": { "x": 460, "y": 70 }, "width": 80, "height": 20, "color": "green" }
+];
 
 function degToRad(deg) {
 	return deg * Math.PI / 180
@@ -235,8 +239,6 @@ class Ghost {
 			this.changeDirection(upWeight, downWeight, leftWeight, rightWeight);
 		}
 
-		console.log(this.prevDirectionChecks);
-
 		this.prevDirectionChecks.up = this.directionCheckers.up.isColliding();
 		this.prevDirectionChecks.down = this.directionCheckers.down.isColliding();
 		this.prevDirectionChecks.left = this.directionCheckers.left.isColliding();
@@ -253,14 +255,14 @@ class Ghost {
 	changeDirection(upWeight, downWeight, leftWeight, rightWeight) {
 		let pacmanDirection = game.pacman.position.subVec(this.position).normalized();
 		if (pacmanDirection.x > 0) {
-			rightWeight += Math.round(rightWeight * pacmanDirection.x);
+			rightWeight += Math.round(rightWeight * pacmanDirection.x * 2);
 		} else {
-			leftWeight += Math.round(leftWeight * Math.abs(pacmanDirection.x));
+			leftWeight += Math.round(leftWeight * Math.abs(pacmanDirection.x * 2));
 		}
 		if (pacmanDirection.y > 0) {
-			downWeight += Math.round(downWeight * pacmanDirection.y);
+			downWeight += Math.round(downWeight * pacmanDirection.y * 2);
 		} else {
-			upWeight += Math.round(upWeight * Math.abs(pacmanDirection.y));
+			upWeight += Math.round(upWeight * Math.abs(pacmanDirection.y * 2));
 		}
 		let weights = [upWeight, downWeight, leftWeight, rightWeight];
 		let newDirection = weightedRandom(["up", "down", "left", "right"], weights)
@@ -506,6 +508,16 @@ function drawBg(color) {
 	ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+function loadMap(mapJson) {
+	// let mapArr = JSON.parse(mapJson);
+	let mapArr = mapJson;
+	for (let wall of mapArr) {
+		game.gameObjects.unshift(
+			new Wall(wall.position, wall.width, wall.height, wall.color)
+		);
+	}
+}
+
 function gameInput(event) {
 	if (event.defaultPrevented) { return; }
 
@@ -523,8 +535,24 @@ function gameInput(event) {
 			inputDirection = "down";
 			break;
 		case "z":
-			console.log("undo");
-			game.gameObjects.splice(game.gameObjects.indexOf(lastAddedWall), 1);
+			if (wallEditOn) {
+				console.log("undo");
+				game.gameObjects.splice(game.gameObjects.indexOf(lastAddedWall), 1);
+				newMap.splice(newMap.indexOf(lastAddedWall), 1);
+			}
+			break;
+		case "m":
+			if (wallEditOn) {
+				console.log("saving map");
+				let mapJson = JSON.stringify(newMap);
+				console.log(mapJson);
+			}
+			break;
+		case "l":
+			if (wallEditOn) {
+				console.log("loading map");
+				loadMap(mapToLoad);
+			}
 			break;
 	}
 }
@@ -555,6 +583,7 @@ function handlePointerEnd(event) {
 		let newWall = new Wall(wallPos, wallWidth, wallHeight, "green");
 		console.log(newWall);
 		game.gameObjects.unshift(newWall);
+		newMap.unshift(newWall);
 		lastAddedWall = newWall;
 	}
 
@@ -574,8 +603,9 @@ function start() {
 	canvas.height = window.innerHeight - 5;
 	ctx.scale(1, 1);
 	console.log(game.gameObjects);
+
+	let interval = setInterval(gameUpdate, gameMSPT, gameMSPT / 1000);
 }
 
 start();
-let interval = setInterval(gameUpdate, gameMSPT, gameMSPT / 1000);
 
