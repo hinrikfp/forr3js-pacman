@@ -2,6 +2,7 @@ let canvas = document.getElementById("gameCanvas");
 let ctx = canvas.getContext("2d");
 
 let gameMSPT = 16.6;
+let scale = 0.75;
 
 let bgColor = "rgb(0,0,35)";
 
@@ -25,6 +26,8 @@ let mapToLoad = [
 function degToRad(deg) {
 	return deg * Math.PI / 180
 }
+
+const clamp = (num, min, max) => Math.min(Math.max(num, min), max)
 
 function weightedRandom(values, weights) {
 	let weightSum = 0;
@@ -77,10 +80,11 @@ class Vec2 {
 class Pacman {
 	tag = "Pacman";
 	shouldCollide = true;
-	constructor(position, speed, radius) {
+	constructor(position, speed, radius, lives) {
 		this.position = position;
 		this.speed = speed;
 		this.radius = radius;
+		this.lives = lives;
 		this.points = 0;
 		this.direction = "right";
 
@@ -133,8 +137,9 @@ class Pacman {
 			c.delete();
 			// console.log(`points: ${this.points}`);
 		}
-		if (c.tag === "Wall") {
-			// console.log("Wall");
+		if (c.tag === "Ghost") {
+			this.lives = clamp(this.lives - 1, 0, 3);
+			console.log(this.lives);
 		}
 	}
 }
@@ -350,9 +355,56 @@ class Grid {
 
 let grid = new Grid(new Vec2(10, 10), 540, 540, 30);
 
+class ScoreText {
+	tag = "ScoreText";
+	shouldCollide = false;
+	constructor(position, color, font) {
+		this.position = position;
+		this.color = color;
+		this.text = "";
+		this.font = font;
+	}
+
+	draw() {
+		ctx.font = this.font;
+		ctx.fillStyle = this.color;
+		ctx.fillText(this.text, this.position.x, this.position.y);
+	}
+	update(delta) {
+		this.text = `Score: ${game.pacman.points}`;
+	}
+	collision(c) { }
+}
+
+class HeartDisplay {
+	constructor(position, color, scale) {
+		this.position = position;
+		this.color = color;
+		this.scale = scale;
+		this.count = 3;
+	}
+
+	draw() {
+		ctx.fillStyle = this.color;
+		for (let i = 0; i < this.count; i++) {
+			ctx.beginPath();
+			ctx.arc(this.position.x + 50 * this.scale * i, this.position.y, 20 * this.scale, degToRad(0), degToRad(360));
+			ctx.fill();
+			ctx.stroke();
+		}
+	}
+
+	update(delta) {
+		this.count = game.pacman.lives;
+	}
+	collision(c) { }
+}
+
 class Game {
 	constructor() {
-		this.pacman = new Pacman(new Vec2(100, 100), 100, 15);
+		this.pacman = new Pacman(new Vec2(100, 100), 100, 15, 3);
+		this.scoreText = new ScoreText(new Vec2(580, 40), "blue", "30px serif");
+		this.heartDisplay = new HeartDisplay(new Vec2(600, 100), "red", 1);
 		this.ghosts = [
 			new Ghost(new Vec2(200, 200), "red", 15, 60),
 			new Ghost(new Vec2(250, 200), "pink", 15, 80),
@@ -375,6 +427,8 @@ class Game {
 		this.gameObjects = [];
 		this.gameObjects.push(this.pacman);
 		this.gameObjects.push(grid);
+		this.gameObjects.push(this.scoreText);
+		this.gameObjects.push(this.heartDisplay);
 		this.ghosts.forEach((g) => { this.gameObjects.unshift(g) });
 		this.points.forEach((p) => { this.gameObjects.unshift(p) });
 		this.walls.forEach((w) => { this.gameObjects.unshift(w) });
@@ -505,7 +559,7 @@ function drawSquare(x, y, size, color) {
 
 function drawBg(color) {
 	ctx.fillStyle = color;
-	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.fillRect(0, 0, canvas.width * (1 / scale), canvas.height * (1 / scale));
 }
 
 function loadMap(mapJson) {
@@ -552,6 +606,11 @@ function gameInput(event) {
 			if (wallEditOn) {
 				console.log("loading map");
 				loadMap(mapToLoad);
+			}
+			break;
+		case "f":
+			if (canvas.requestFullscreen) {
+				canvas.requestFullscreen();
 			}
 			break;
 	}
@@ -601,8 +660,9 @@ function start() {
 	document.addEventListener("pointerup", handlePointerEnd);
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight - 5;
-	ctx.scale(1, 1);
+	ctx.scale(0.75, 0.75);
 	console.log(game.gameObjects);
+
 
 	let interval = setInterval(gameUpdate, gameMSPT, gameMSPT / 1000);
 }
