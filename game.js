@@ -410,8 +410,8 @@ class HeartDisplay {
 class Game {
 	constructor() {
 		this.pacman = new Pacman(new Vec2(100, 100), 100, 15, 3);
-		this.scoreText = new ScoreText(new Vec2(580, 40), "blue", "30px serif");
-		this.heartDisplay = new HeartDisplay(new Vec2(600, 100), "red", 1);
+		this.scoreText = new ScoreText(new Vec2(20, 600), "blue", "30px serif");
+		this.heartDisplay = new HeartDisplay(new Vec2(300, 590), "red", 1);
 		this.ghosts = [
 			new Ghost(new Vec2(200, 200), "red", 15, 60),
 			new Ghost(new Vec2(250, 200), "pink", 15, 80),
@@ -570,10 +570,12 @@ function drawBg(color) {
 }
 
 function resizeCanvas() {
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
 	if (window.innerWidth < window.innerHeight) {
-		scale = window.innerWidth / 600;
+		scale = window.innerWidth / 580;
 	} else {
-		scale = window.innerHeight / 600;
+		scale = window.innerHeight / 620;
 	}
 	console.log("resize", scale);
 	ctx.setTransform(scale, 0, 0, scale, 0, 0);
