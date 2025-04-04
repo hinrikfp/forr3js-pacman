@@ -143,7 +143,6 @@ class Pacman {
 	}
 
 	die() {
-		console.log("dead");
 		// Navigator.vibrate(200);
 		this.position = new Vec2(280, 340);
 		this.direction = "down";
@@ -192,6 +191,7 @@ class Ghost {
 			left: false,
 			right: false,
 		}
+		this.huntingChanceMul = 3;
 	}
 
 	draw() {
@@ -267,14 +267,14 @@ class Ghost {
 	changeDirection(upWeight, downWeight, leftWeight, rightWeight) {
 		let pacmanDirection = game.pacman.position.subVec(this.position).normalized();
 		if (pacmanDirection.x > 0) {
-			rightWeight += Math.round(rightWeight * pacmanDirection.x * 2);
+			rightWeight += Math.round(rightWeight * pacmanDirection.x * this.huntingChanceMul);
 		} else {
-			leftWeight += Math.round(leftWeight * Math.abs(pacmanDirection.x * 2));
+			leftWeight += Math.round(leftWeight * Math.abs(pacmanDirection.x * this.huntingChanceMul));
 		}
 		if (pacmanDirection.y > 0) {
-			downWeight += Math.round(downWeight * pacmanDirection.y * 2);
+			downWeight += Math.round(downWeight * pacmanDirection.y * this.huntingChanceMul);
 		} else {
-			upWeight += Math.round(upWeight * Math.abs(pacmanDirection.y * 2));
+			upWeight += Math.round(upWeight * Math.abs(pacmanDirection.y * this.huntingChanceMul));
 		}
 		let weights = [upWeight, downWeight, leftWeight, rightWeight];
 		let newDirection = weightedRandom(["up", "down", "left", "right"], weights)
@@ -339,20 +339,24 @@ class Wall {
 class Grid {
 	tag = "Grid";
 	shouldCollide = false;
+	isHidden = false;
 	constructor(position, width, height, spacing) {
 		this.position = position;
 		this.width = width;
 		this.height = height;
 		this.spacing = spacing;
+		this.color = "blue";
 	}
 
 	draw() {
-		ctx.fillStyle = "blue";
-		for (let x = 0; x <= this.width; x += this.spacing) {
-			ctx.fillRect(this.position.x + x, this.position.y, 1, this.height);
-		}
-		for (let y = 0; y <= this.height; y += this.spacing) {
-			ctx.fillRect(this.position.x, this.position.y + y, this.width, 1);
+		if (!this.isHidden) {
+			ctx.fillStyle = this.color;
+			for (let x = 0; x <= this.width; x += this.spacing) {
+				ctx.fillRect(this.position.x + x, this.position.y, 1, this.height);
+			}
+			for (let y = 0; y <= this.height; y += this.spacing) {
+				ctx.fillRect(this.position.x, this.position.y + y, this.width, 1);
+			}
 		}
 	}
 
@@ -433,11 +437,11 @@ class Game {
 
 		this.gameObjects = [];
 		this.gameObjects.push(this.pacman);
-		this.gameObjects.push(grid);
 		this.gameObjects.push(this.scoreText);
 		this.gameObjects.push(this.heartDisplay);
 		this.ghosts.forEach((g) => { this.gameObjects.unshift(g) });
 		this.points.forEach((p) => { this.gameObjects.unshift(p) });
+		this.gameObjects.unshift(grid);
 		this.walls.forEach((w) => { this.gameObjects.unshift(w) });
 	}
 
@@ -577,7 +581,6 @@ function resizeCanvas() {
 	} else {
 		scale = window.innerHeight / 620;
 	}
-	console.log("resize", scale);
 	ctx.setTransform(scale, 0, 0, scale, 0, 0);
 }
 
@@ -627,19 +630,13 @@ function gameInput(event) {
 				loadMap(mapToLoad);
 			}
 			break;
-		case "f":
-			if (document.requestFullscreen) {
-				document.documentElement.requestFullscreen();
-			}
-			break;
 	}
 }
 
 function handlePointerStart(event) {
 	ongoingTouches.set(event.pointerId, new Vec2(event.pageX, event.pageY));
-	resizeCanvas();
-	if (!document.fullscreenElement) {
-		document.documentElement.requestFullscreen().then(() => { console.log("fullscreen"); resizeCanvas() })
+	if (!document.fullscreenElement && document.documentElement.requestFullscreen != undefined) {
+		document.documentElement.requestFullscreen();
 	}
 }
 
@@ -718,7 +715,7 @@ function start() {
 	document.addEventListener("pointerdown", handlePointerStart);
 	document.addEventListener("pointermove", handlePointerMove);
 	document.addEventListener("pointerup", handlePointerEnd);
-	window.addEventListener("resize", (event) => { console.log("resize event"); resizeCanvas() });
+	window.addEventListener("resize", (event) => { resizeCanvas() });
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight - 5;
 	console.log(game.gameObjects);
