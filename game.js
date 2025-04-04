@@ -16,7 +16,7 @@ const DIRECTIONS = [
 
 let ongoingTouches = new Map();
 
-let wallEditOn = true;
+let wallEditOn = false;
 let lastAddedWall;
 let newMap = [];
 let mapToLoad = [
@@ -138,9 +138,16 @@ class Pacman {
 			// console.log(`points: ${this.points}`);
 		}
 		if (c.tag === "Ghost") {
-			this.lives = clamp(this.lives - 1, 0, 3);
-			console.log(this.lives);
+			this.die();
 		}
+	}
+
+	die() {
+		console.log("dead");
+		// Navigator.vibrate(200);
+		this.position = new Vec2(280, 340);
+		this.direction = "down";
+		this.lives = clamp(this.lives - 1, 0, 3);
 	}
 }
 
@@ -562,6 +569,16 @@ function drawBg(color) {
 	ctx.fillRect(0, 0, canvas.width * (1 / scale), canvas.height * (1 / scale));
 }
 
+function resizeCanvas() {
+	if (window.innerWidth < window.innerHeight) {
+		scale = window.innerWidth / 600;
+	} else {
+		scale = window.innerHeight / 600;
+	}
+	console.log("resize", scale);
+	ctx.setTransform(scale, 0, 0, scale, 0, 0);
+}
+
 function loadMap(mapJson) {
 	// let mapArr = JSON.parse(mapJson);
 	let mapArr = mapJson;
@@ -609,8 +626,8 @@ function gameInput(event) {
 			}
 			break;
 		case "f":
-			if (canvas.requestFullscreen) {
-				canvas.requestFullscreen();
+			if (document.requestFullscreen) {
+				document.documentElement.requestFullscreen();
 			}
 			break;
 	}
@@ -618,6 +635,46 @@ function gameInput(event) {
 
 function handlePointerStart(event) {
 	ongoingTouches.set(event.pointerId, new Vec2(event.pageX, event.pageY));
+	resizeCanvas();
+	if (!document.fullscreenElement) {
+		document.documentElement.requestFullscreen().then(() => { console.log("fullscreen"); resizeCanvas() })
+	}
+}
+
+function handlePointerMove(event) {
+	if (!ongoingTouches.get(event.pointerId)) { return; }
+
+	let touch = {
+		start: ongoingTouches.get(event.pointerId),
+		current: new Vec2(event.pageX, event.pageY),
+	};
+
+	if (touch.start.subVec(touch.current).magnitude() > 10) {
+		let direction = touch.start.subVec(touch.current).normalized();
+		let xBigger = "";
+		let yBigger = "";
+		let directionString = "";
+		if (direction.x < 0) {
+			xBigger = "right";
+		} else {
+			xBigger = "left";
+		}
+		if (direction.y < 0) {
+			yBigger = "down";
+		} else {
+			yBigger = "up";
+		}
+		if (Math.abs(direction.x) > Math.abs(direction.y)) {
+			directionString = xBigger;
+		} else {
+			directionString = yBigger;
+		}
+
+		if (directionString.length != 0) {
+			inputDirection = directionString;
+		}
+	}
+
 }
 
 function handlePointerEnd(event) {
@@ -657,11 +714,14 @@ function gameUpdate(delta) {
 function start() {
 	document.addEventListener("keydown", gameInput);
 	document.addEventListener("pointerdown", handlePointerStart);
+	document.addEventListener("pointermove", handlePointerMove);
 	document.addEventListener("pointerup", handlePointerEnd);
+	window.addEventListener("resize", (event) => { console.log("resize event"); resizeCanvas() });
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight - 5;
-	ctx.scale(0.75, 0.75);
 	console.log(game.gameObjects);
+	loadMap(mapToLoad);
+	resizeCanvas();
 
 
 	let interval = setInterval(gameUpdate, gameMSPT, gameMSPT / 1000);
