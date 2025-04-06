@@ -75,6 +75,10 @@ class Vec2 {
 		let mag = Math.sqrt(this.x * this.x + this.y * this.y);
 		return new Vec2(this.x / mag, this.y / mag);
 	}
+
+	clone() {
+		return new Vec2(this.x, this.y);
+	}
 }
 
 class Pacman {
@@ -82,6 +86,7 @@ class Pacman {
 	shouldCollide = true;
 	constructor(position, speed, radius, lives) {
 		this.position = position;
+		this.startingPosition = position.clone();
 		this.speed = speed;
 		this.radius = radius;
 		this.lives = lives;
@@ -135,7 +140,9 @@ class Pacman {
 		if (c.tag === "Point") {
 			this.points += c.worth;
 			c.delete();
-			// console.log(`points: ${this.points}`);
+			if (this.points >= game.maxPoints) {
+				game.gameOver();
+			}
 		}
 		if (c.tag === "Ghost") {
 			this.die();
@@ -144,9 +151,13 @@ class Pacman {
 
 	die() {
 		// Navigator.vibrate(200);
-		this.position = new Vec2(280, 340);
+		this.position = this.startingPosition.clone();
 		this.direction = "down";
-		this.lives = clamp(this.lives - 1, 0, 3);
+		this.lives = clamp(this.lives - 1, 0, this.lives);
+		if (this.lives <= 0) {
+			game.gameOver();
+		}
+		game.resetGhosts();
 	}
 }
 
@@ -175,6 +186,7 @@ class Ghost {
 	shouldCollide = true;
 	constructor(position, color, radius, speed) {
 		this.position = position;
+		this.startingPosition = position.clone();
 		this.color = color;
 		this.radius = radius;
 		this.speed = speed;
@@ -191,7 +203,7 @@ class Ghost {
 			left: false,
 			right: false,
 		}
-		this.huntingChanceMul = 3;
+		this.huntingChanceMul = 5;
 	}
 
 	draw() {
@@ -280,6 +292,10 @@ class Ghost {
 		let newDirection = weightedRandom(["up", "down", "left", "right"], weights)
 		this.direction = newDirection
 	}
+
+	resetPosition() {
+		this.position = this.startingPosition.clone();
+	}
 }
 
 class Point {
@@ -366,13 +382,13 @@ class Grid {
 
 let grid = new Grid(new Vec2(10, 10), 540, 540, 30);
 
-class ScoreText {
-	tag = "ScoreText";
+class TextDisplay {
+	tag = "Text";
 	shouldCollide = false;
-	constructor(position, color, font) {
+	constructor(position, text, color, font) {
 		this.position = position;
+		this.text = text;
 		this.color = color;
-		this.text = "";
 		this.font = font;
 	}
 
@@ -381,10 +397,20 @@ class ScoreText {
 		ctx.fillStyle = this.color;
 		ctx.fillText(this.text, this.position.x, this.position.y);
 	}
+	update() { }
+	collision(c) { }
+}
+
+class ScoreText extends TextDisplay {
+	tag = "ScoreText";
+	shouldCollide = false;
+	constructor(position, color, font) {
+		super(position, "", color, font)
+	}
+
 	update(delta) {
 		this.text = `Score: ${game.pacman.points}`;
 	}
-	collision(c) { }
 }
 
 class HeartDisplay {
@@ -412,20 +438,21 @@ class HeartDisplay {
 }
 
 class Game {
+	maxPoints = 100;
 	constructor() {
-		this.pacman = new Pacman(new Vec2(100, 100), 100, 15, 3);
+		this.pacman = new Pacman(new Vec2(280, 340), 100, 15, 3);
 		this.scoreText = new ScoreText(new Vec2(20, 600), "blue", "30px serif");
 		this.heartDisplay = new HeartDisplay(new Vec2(300, 590), "red", 1);
 		this.ghosts = [
-			new Ghost(new Vec2(200, 200), "red", 15, 60),
-			new Ghost(new Vec2(250, 200), "pink", 15, 80),
-			new Ghost(new Vec2(300, 200), "cyan", 15, 65),
-			new Ghost(new Vec2(350, 200), "orange", 15, 70),
+			new Ghost(new Vec2(40, 40), "red", 15, 60),
+			new Ghost(new Vec2(520, 40), "pink", 15, 80),
+			new Ghost(new Vec2(40, 520), "cyan", 15, 65),
+			new Ghost(new Vec2(520, 520), "orange", 15, 70),
 		];
 		this.points = []
 		for (let x = 0; x < 17; x++) {
 			for (let y = 0; y < 17; y++) {
-				this.points.push(new Point(new Vec2(40 + x * 30, 40 + y * 30), 10, "#ebcb4b", 5))
+				this.points.push(new Point(new Vec2(40 + x * 30, 40 + y * 30), 1, "#ebcb4b", 5))
 			}
 		}
 		this.walls = [
@@ -485,6 +512,26 @@ class Game {
 		this.collide();
 
 		this.draw();
+	}
+
+	gameOver() {
+		this.gameObjects.splice(0, game.gameObjects.length);
+		if (this.pacman.points >= this.maxPoints) {
+			this.gameObjects.push(new TextDisplay(new Vec2(200, 300), "Game Over, You won", "yellow", "40px serif"));
+		} else {
+			this.gameObjects.push(new TextDisplay(new Vec2(150, 300), "Game Over, You lost.", "red", "30px serif"));
+			this.gameObjects.push(new TextDisplay(new Vec2(150, 400), `Final score: ${game.pacman.points}`, "red", "30px serif"));
+		}
+	}
+
+	countPoints() {
+		let newMaxPoints = 0;
+		this.gameObjects.forEach(o => { if (o.tag === "Point") { newMaxPoints += o.worth; } });
+		this.maxPoints = newMaxPoints;
+	}
+
+	resetGhosts() {
+		this.ghosts.forEach(g => g.resetPosition());
 	}
 }
 
@@ -722,6 +769,12 @@ function start() {
 	loadMap(mapToLoad);
 	resizeCanvas();
 
+	// these collisions are necessary so that the walls get rid of overlapping points
+	// this could be done in some more efficient way but whatever.
+	game.collide();
+	game.collide();
+	game.countPoints();
+	console.log(game.maxPoints);
 
 	let interval = setInterval(gameUpdate, gameMSPT, gameMSPT / 1000);
 }
